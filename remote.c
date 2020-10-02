@@ -2514,10 +2514,9 @@ static int is_reachable_in_reflog(const char *local, const struct ref *remote)
 {
 	timestamp_t date;
 	struct commit *commit;
-	struct commit **chunk;
 	struct check_and_collect_until_cb_data cb;
 	struct reflog_commit_array arr = REFLOG_COMMIT_ARRAY_INIT;
-	size_t size = 0;
+	struct commit_list *reachable;
 	int ret = 0;
 
 	commit = lookup_commit_reference(the_repository, &remote->old_oid);
@@ -2543,14 +2542,9 @@ static int is_reachable_in_reflog(const char *local, const struct ref *remote)
 	 * Check if the remote commit is reachable from any
 	 * of the commits in the collected array, in batches.
 	 */
-	for (chunk = arr.item; chunk < arr.item + arr.nr; chunk += size) {
-		size = arr.item + arr.nr - chunk;
-		if (MERGE_BASES_BATCH_SIZE < size)
-			size = MERGE_BASES_BATCH_SIZE;
-
-		if ((ret = in_merge_bases_many(commit, size, chunk)))
-			break;
-	}
+	reachable = get_reachable_subset(arr.item, arr.nr, &commit, 1, 0);
+	ret = !!reachable;
+	free_commit_list(reachable);
 
 cleanup_return:
 	free_commit_array(&arr);
